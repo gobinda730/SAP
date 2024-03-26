@@ -1,0 +1,72 @@
+
+CLASS lcl_main DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF ty_result,
+             kunnr TYPE kna1-kunnr,
+             vbeln TYPE vbak-vbeln,
+             matnr TYPE vbap-matnr,
+             maktx TYPE makt-maktx,
+           END OF ty_result.
+
+    METHODS: main.
+    CLASS-METHODS: select_data
+                    IMPORTING
+                      it_tables TYPE TABLE OF REF TO data
+                    EXPORTING
+                      et_result TYPE TABLE OF ty_result.
+ENDCLASS.
+
+CLASS lcl_main IMPLEMENTATION.
+  METHOD main.
+    DATA: lt_tables TYPE TABLE OF REF TO data,
+          lt_result TYPE TABLE OF ty_result.
+
+    " Dynamic structure creation
+    CREATE DATA lt_tables TYPE TABLE OF REF TO data.
+    APPEND VALUE #( name = 'KNA1' ) TO lt_tables.
+    APPEND VALUE #( name = 'VBAK' ) TO lt_tables.
+    APPEND VALUE #( name = 'VBAP' ) TO lt_tables.
+    APPEND VALUE #( name = 'MARA' ) TO lt_tables.
+    APPEND VALUE #( name = 'MAKT' ) TO lt_tables.
+
+    " Select data using JOIN
+    lt_result = select_data( lt_tables ).
+
+    " Display the result
+    LOOP AT lt_result INTO DATA(ls_result).
+      WRITE: / 'Customer:', ls_result-kunnr,
+             / 'Sales Order:', ls_result-vbeln,
+             / 'Material:', ls_result-matnr,
+             / 'Description:', ls_result-maktx.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD select_data.
+    DATA: lt_result TYPE TABLE OF ty_result.
+
+    " Get table descriptions
+    DATA(lo_table_descr) = cl_abap_tabledescr=>describe_by_data( it_tables[1] ).
+    DATA(lo_table1_descr) = lo_table_descr->get_table_line_type( ).
+    DATA(lo_table2_descr) = cl_abap_tabledescr=>describe_by_data( it_tables[2] ).
+    DATA(lo_table2_key) = lo_table2_descr->get_key( ).
+
+    " JOIN statement
+    SELECT kna1~kunnr vbeln matnr maktx
+      FROM (lt_tables[1]) AS kna1
+      JOIN (lt_tables[2]) AS vbak
+      ON kna1~kunnr = vbak~kunnr
+      JOIN (lt_tables[3]) AS vbap
+      ON vbak~vbeln = vbap~vbeln
+      JOIN (lt_tables[4]) AS mara
+      ON vbap~matnr = mara~matnr
+      JOIN (lt_tables[5]) AS makt
+      ON mara~matnr = makt~matnr
+      INTO TABLE @lt_result.
+
+    " Return the result
+    et_result = lt_result.
+  ENDMETHOD.
+ENDCLASS.
+
+START-OF-SELECTION.
+  lcl_main=>main( ).
